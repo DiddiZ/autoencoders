@@ -86,6 +86,21 @@ class VAE(Autoencoder):
         return reconstruction, z, z_mean, z_log_var
 
     @tf.function
+    def sample(self, N):
+        """Reconstruct random samples from the latent space.
+
+        Returns:
+            reconstruction: Output of the AE
+        """
+        # Random sample
+        z = tf.random.normal((N, self.latent_dim))
+
+        # Reconstruct from latent representation
+        reconstruction = tf.nn.sigmoid(self.decoder(z))
+
+        return reconstruction
+
+    @tf.function
     def train(self, opt, input_image):
         with tf.GradientTape() as tape:
             reconstructed, _, z_mean, z_log_var = self(input_image, training=True)
@@ -132,14 +147,16 @@ class VAE_GAN(VAE):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         with tf.GradientTape() as enc_tape, tf.GradientTape() as dec_tape, tf.GradientTape() as dis_tape:
-            reconstructed, _, z_mean, z_log_var = self(input_image, training=True)
+            reconstruction, _, z_mean, z_log_var = self(input_image, training=True)
+            reconstruction_random = self.sample(tf.shape(input_image)[0])
 
             # Run distriminator on target images
             dis_real_inter = self.discriminator_l(input_image, training=False)
             dis_real_logits = self.discriminator(input_image, training=True)
             # Run distriminator on generated images
-            dis_fake_inter = self.discriminator_l(reconstructed, training=False)
-            dis_fake_logits = self.discriminator(reconstructed, training=True)
+            dis_fake_inter = self.discriminator_l(reconstruction, training=False)
+            dis_fake_logits = self.discriminator(reconstruction, training=True)
+            dis_fake2_logits = self.discriminator(reconstruction_random, training=True)
 
             # MSE at l-th discriminator layer
             loss_rec = tf.reduce_mean(tf.square(dis_real_inter - dis_fake_inter))
@@ -148,7 +165,10 @@ class VAE_GAN(VAE):
             # Cross-entropy of real images
             loss_real = tf.reduce_mean(cross_entropy(0.1 * tf.ones_like(dis_real_logits), dis_real_logits))
             # Cross-entropy of generated images
-            loss_fake = tf.reduce_mean(cross_entropy(0.9 * tf.ones_like(dis_fake_logits), dis_fake_logits))
+            loss_fake = (
+                tf.reduce_mean(cross_entropy(0.9 * tf.ones_like(dis_fake_logits), dis_fake_logits)) +
+                tf.reduce_mean(cross_entropy(0.9 * tf.ones_like(dis_fake2_logits), dis_fake2_logits))
+            ) / 2
             # Ability of generator to fool the discriminator
             loss_fool = tf.reduce_mean(cross_entropy(tf.zeros_like(dis_fake_logits), dis_fake_logits))
 

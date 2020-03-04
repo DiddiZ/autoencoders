@@ -97,9 +97,7 @@ if __name__ == "__main__":
             tf.summary.scalar('test/loss_rec', tf.reduce_mean(tf.square(image - reconstructed)), step=epoch)
 
             # Log random sample reconstruction
-            z = tf.random.normal((6, latent_dim))
-            reconstructed = tf.nn.sigmoid(model.decoder(z))
-            tf.summary.image('random', reconstructed, step=epoch, max_outputs=6)
+            tf.summary.image('random', model.sample(6), step=epoch, max_outputs=6)
 
             writer.flush()
 
