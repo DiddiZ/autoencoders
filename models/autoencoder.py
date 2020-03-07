@@ -132,8 +132,11 @@ class VAE_GAN(VAE):
         """
         super().__init__(encoder, decoder, beta_kl)
 
-        self.discriminator = discriminator
-        self.discriminator_l = tf.keras.models.Model(inputs=discriminator.input, outputs=discriminator.layers[l].output)
+        # Expose l-th layer of discriminator
+        self.discriminator = tf.keras.Model(
+            inputs=discriminator.input,
+            outputs=[discriminator.layers[l].output, discriminator.output],
+        )
 
         # Metrics
         self.metric_loss_enc = tf.metrics.Mean('train/loss_enc')
@@ -151,12 +154,10 @@ class VAE_GAN(VAE):
             reconstruction_random = self.sample(tf.shape(input_image)[0])
 
             # Run distriminator on target images
-            dis_real_inter = self.discriminator_l(input_image, training=False)
-            dis_real_logits = self.discriminator(input_image, training=True)
+            dis_real_inter, dis_real_logits = self.discriminator(input_image, training=True)
             # Run distriminator on generated images
-            dis_fake_inter = self.discriminator_l(reconstruction, training=False)
-            dis_fake_logits = self.discriminator(reconstruction, training=True)
-            dis_fake2_logits = self.discriminator(reconstruction_random, training=True)
+            dis_fake_inter, dis_fake_logits = self.discriminator(reconstruction, training=True)
+            _, dis_fake2_logits = self.discriminator(reconstruction_random, training=True)
 
             # MSE at l-th discriminator layer
             loss_rec = tf.reduce_mean(tf.square(dis_real_inter - dis_fake_inter))
