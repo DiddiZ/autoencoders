@@ -30,10 +30,13 @@ class Autoencoder(tf.keras.models.Model):
         return reconstruction, z
 
     @tf.function
-    def train(self, opt, input_image):
+    def train(self, opt, input_image, output_image=None):
+        if output_image is None:
+            output_image = input_image
+
         with tf.GradientTape() as tape:
             reconstructed, z = self(input_image, training=True)
-            loss_rec = tf.reduce_mean(tf.square(input_image - reconstructed))
+            loss_rec = tf.reduce_mean(tf.square(output_image - reconstructed))
             loss = loss_rec
 
         gradients = tape.gradient(loss, self.trainable_variables)
@@ -101,11 +104,14 @@ class VAE(Autoencoder):
         return reconstruction
 
     @tf.function
-    def train(self, opt, input_image):
+    def train(self, opt, input_image, output_image=None):
+        if output_image is None:
+            output_image = input_image
+
         with tf.GradientTape() as tape:
             reconstructed, _, z_mean, z_log_var = self(input_image, training=True)
 
-            loss_rec = tf.reduce_mean(tf.square(input_image - reconstructed))
+            loss_rec = tf.reduce_mean(tf.square(output_image - reconstructed))
             loss_kl = 0.5 * tf.reduce_mean(tf.exp(z_log_var) + tf.square(z_mean) - z_log_var - 1)
             loss = loss_rec + self.beta_kl * loss_kl
 
@@ -146,7 +152,10 @@ class VAE_GAN(VAE):
         self.metric_acc_fake = tf.metrics.Accuracy('train/acc_fake')
 
     @tf.function
-    def train(self, opt, input_image):
+    def train(self, opt, input_image, output_image=None):
+        if output_image is None:
+            output_image = input_image
+
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         with tf.GradientTape() as enc_tape, tf.GradientTape() as dec_tape, tf.GradientTape() as dis_tape:
@@ -154,7 +163,7 @@ class VAE_GAN(VAE):
             reconstruction_random = self.sample(tf.shape(input_image)[0])
 
             # Run distriminator on target images
-            dis_real_inter, dis_real_logits = self.discriminator(input_image, training=True)
+            dis_real_inter, dis_real_logits = self.discriminator(output_image, training=True)
             # Run distriminator on generated images
             dis_fake_inter, dis_fake_logits = self.discriminator(reconstruction, training=True)
             _, dis_fake2_logits = self.discriminator(reconstruction_random, training=True)
