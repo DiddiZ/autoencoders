@@ -8,9 +8,10 @@ import requests
 import threading
 from pathlib import Path
 from tempfile import gettempdir
-import tqdm
+from tqdm import tqdm
 
 cache = Path(gettempdir()) / 'scryfall_cache'
+cache.mkdir(exist_ok=True)
 last_scryfall_api_call = 0
 scryfall_api_call_delay = 0.1
 _lock = threading.Lock()
